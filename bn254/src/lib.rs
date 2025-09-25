@@ -8,4 +8,5 @@ mod helpers;
 mod poseidon2;
 
 pub use bn254::*;
+pub use helpers::monty_mul;
 pub use poseidon2::Poseidon2Bn254;

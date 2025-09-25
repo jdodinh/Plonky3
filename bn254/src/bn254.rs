@@ -26,7 +26,7 @@ use crate::helpers::{
 /// The BN254 prime represented as a little-endian array of 4-u64s.
 ///
 /// Equal to: `21888242871839275222246405745257275088548364400416034343698204186575808495617`
-pub(crate) const BN254_PRIME: [u64; 4] = [
+pub const BN254_PRIME: [u64; 4] = [
     0x43e1f593f0000001,
     0x2833e84879b97091,
     0xb85045b68181585d,
@@ -57,7 +57,7 @@ pub(crate) const BN254_MONTY_R_SQ: [u64; 4] = [
 #[must_use]
 pub struct Bn254 {
     /// The MONTY form of the field element, a 254-bit integer less than `P` saved as a collection of u64's using a little-endian order.
-    pub(crate) value: [u64; 4],
+    pub value: [u64; 4],
 }
 
 impl Bn254 {
@@ -66,7 +66,7 @@ impl Bn254 {
     /// The array is assumed to correspond to a 254-bit integer less than P and is interpreted as
     /// already being in Montgomery form.
     #[inline]
-    pub(crate) const fn new_monty(value: [u64; 4]) -> Self {
+    pub const fn new_monty(value: [u64; 4]) -> Self {
         Self { value }
     }
 
@@ -90,6 +90,23 @@ impl Bn254 {
         }
     }
 
+    #[inline]
+    pub fn from_canonical_u256(value: [u64; 4]) -> Option<Self> {
+        Self::from_biguint(to_biguint(value))
+    }
+
+    #[inline]
+    pub fn as_canonical_u256(&self) -> [u64; 4] {
+        monty_mul(self.value, [1, 0, 0, 0])
+    }
+
+    #[inline]
+    pub fn from_canonical_vector(input: Vec<[u64; 4]>) -> Vec<Self> {
+        input
+            .iter()
+            .map(|&val| Self::from_canonical_u256(val).unwrap())
+            .collect()
+    }
     /// Converts the a byte array in little-endian order to a field element.
     ///
     /// Assumes the bytes correspond to the Montgomery form of the desired field element.

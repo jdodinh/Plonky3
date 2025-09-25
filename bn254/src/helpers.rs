@@ -185,7 +185,7 @@ fn interleaved_monty_reduction(acc0: u64, acc: [u64; 4]) -> [u64; 4] {
 /// The output is a 4-limb array representing the result of `lhs * rhs * 2^{-256} mod P`
 /// guaranteed to be in the range `[0, P)`.
 #[inline]
-pub(crate) fn monty_mul(lhs: [u64; 4], rhs: [u64; 4]) -> [u64; 4] {
+pub fn monty_mul(lhs: [u64; 4], rhs: [u64; 4]) -> [u64; 4] {
     // We need to ensure that `lhs < P` otherwise it's possible for the
     // algorithm to fail and produce a value which is too large.
     debug_assert!(lhs.iter().rev().cmp(BN254_PRIME.iter().rev()) == core::cmp::Ordering::Less);
