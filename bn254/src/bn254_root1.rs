@@ -26,7 +26,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::bn254::{BN254_MONTY_R_SQ, BN254_PRIME};
 use crate::helpers::{
-    gcd_inversion, halve_bn254, monty_mul, to_biguint, wrapping_add, wrapping_sub,
+    gcd_inversion, halve_bn254, monty_mul, monty_mul_runtime, to_biguint, wrapping_add,
+    wrapping_sub,
 };
 
 /// The BN254 curve scalar field with ligetron's root1 as the two-adic generator.
@@ -47,6 +48,13 @@ impl Bn254Root1 {
     #[inline]
     pub const fn new(value: [u64; 4]) -> Self {
         Self::new_monty(monty_mul(BN254_MONTY_R_SQ, value))
+    }
+
+    /// Runtime version of [`new`](Self::new) that uses the `sys_bigint` precompile
+    /// when the `risc0` feature is enabled and compiling for the zkVM target.
+    #[inline]
+    pub fn new_runtime(value: [u64; 4]) -> Self {
+        Self::new_monty(monty_mul_runtime(BN254_MONTY_R_SQ, value))
     }
 
     /// Convert a `[[u64; 4]; N]` array to an array of field elements.
@@ -83,7 +91,7 @@ impl Bn254Root1 {
             1..=4 => {
                 let mut inner = [0; 4];
                 inner[..num_dig].copy_from_slice(&digits);
-                Some(Self::new_monty(monty_mul(BN254_MONTY_R_SQ, inner)))
+                Some(Self::new_monty(monty_mul_runtime(BN254_MONTY_R_SQ, inner)))
             }
             _ => None,
         }
@@ -294,7 +302,7 @@ quotient_map_small_int!(Bn254Root1, i128, [i8, i16, i32, i64]);
 impl QuotientMap<u128> for Bn254Root1 {
     #[inline]
     fn from_int(int: u128) -> Self {
-        let monty_form = monty_mul(BN254_MONTY_R_SQ, [int as u64, (int >> 64) as u64, 0, 0]);
+        let monty_form = monty_mul_runtime(BN254_MONTY_R_SQ, [int as u64, (int >> 64) as u64, 0, 0]);
         Self::new_monty(monty_form)
     }
 
@@ -333,7 +341,7 @@ impl QuotientMap<i128> for Bn254Root1 {
 impl PrimeField for Bn254Root1 {
     #[inline]
     fn as_canonical_biguint(&self) -> BigUint {
-        let out_val = monty_mul(self.value, [1, 0, 0, 0]);
+        let out_val = monty_mul_runtime(self.value, [1, 0, 0, 0]);
         to_biguint(out_val)
     }
 }
@@ -391,7 +399,7 @@ impl Mul for Bn254Root1 {
 
     #[inline]
     fn mul(self, rhs: Self) -> Self {
-        Self::new_monty(monty_mul(self.value, rhs.value))
+        Self::new_monty(monty_mul_runtime(self.value, rhs.value))
     }
 }
 

@@ -20,7 +20,8 @@ use rand::distr::{Distribution, StandardUniform};
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::helpers::{
-    gcd_inversion, halve_bn254, monty_mul, to_biguint, wrapping_add, wrapping_sub,
+    gcd_inversion, halve_bn254, monty_mul, monty_mul_runtime, to_biguint, wrapping_add,
+    wrapping_sub,
 };
 
 /// The BN254 prime represented as a little-endian array of 4-u64s.
@@ -69,6 +70,13 @@ impl Bn254 {
         Self::new_monty(monty_mul(BN254_MONTY_R_SQ, value))
     }
 
+    /// Runtime version of [`new`](Self::new) that uses the `sys_bigint` precompile
+    /// when the `risc0` feature is enabled and compiling for the zkVM target.
+    #[inline]
+    pub fn new_runtime(value: [u64; 4]) -> Self {
+        Self::new_monty(monty_mul_runtime(BN254_MONTY_R_SQ, value))
+    }
+
     /// Convert a `[[u64; 4]; N]` array to an array of field elements.
     ///
     /// Const version of `input.map(Bn254::new)`.
@@ -107,7 +115,7 @@ impl Bn254 {
                 // We don't need to check that the value is less than the prime as, provided
                 // the lhs entry of `monty_mul` is less than `P`, the result will be less than `P`.
                 // Adjust the value into Montgomery form by multiplying by `R^2` and doing a monty reduction.
-                Some(Self::new_monty(monty_mul(BN254_MONTY_R_SQ, inner)))
+                Some(Self::new_monty(monty_mul_runtime(BN254_MONTY_R_SQ, inner)))
             }
             _ => None, // Too many digits for BN254
         }
@@ -364,7 +372,7 @@ impl QuotientMap<u128> for Bn254 {
         // we can do this by multiplying by `R^2` and doing a monty reduction.
         // This may be able to be improved as some values are always 0 but the compiler is
         // probably smart enough to work that out here?
-        let monty_form = monty_mul(BN254_MONTY_R_SQ, [int as u64, (int >> 64) as u64, 0, 0]);
+        let monty_form = monty_mul_runtime(BN254_MONTY_R_SQ, [int as u64, (int >> 64) as u64, 0, 0]);
         Self::new_monty(monty_form)
     }
 
@@ -411,7 +419,7 @@ impl PrimeField for Bn254 {
     fn as_canonical_biguint(&self) -> BigUint {
         // `monty_mul` strips out a factor of `R` so multiplying by `1` converts a montgomery
         // representation into a canonical representation.
-        let out_val = monty_mul(self.value, [1, 0, 0, 0]);
+        let out_val = monty_mul_runtime(self.value, [1, 0, 0, 0]);
         to_biguint(out_val)
     }
 }
@@ -476,7 +484,7 @@ impl Mul for Bn254 {
 
     #[inline]
     fn mul(self, rhs: Self) -> Self {
-        Self::new_monty(monty_mul(self.value, rhs.value))
+        Self::new_monty(monty_mul_runtime(self.value, rhs.value))
     }
 }
 

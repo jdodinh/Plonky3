@@ -9,6 +9,9 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+risc0 = ["dep:risc0-zkvm-platform"]
+
 [dependencies]
 p3-field.workspace = true
 p3-poseidon2.workspace = true
@@ -19,6 +22,9 @@ num-bigint.workspace = true
 paste.workspace = true
 rand.workspace = true
 serde = { workspace = true, features = ["derive"] }
+
+# Optional (risc0 zkVM acceleration)
+risc0-zkvm-platform = { version = "2.2", optional = true, default-features = false }
 
 [dev-dependencies]
 p3-field-testing = { path = "../field-testing" }

@@ -5,6 +5,70 @@ use p3_util::gcd_inner;
 
 use crate::{BN254_MONTY_MU_64, BN254_PRIME};
 
+/// BN254 prime as little-endian `[u32; 8]` for `sys_bigint`.
+const BN254_PRIME_U32: [u32; 8] = [
+    0xF0000001, 0x43E1F593, 0x79B97091, 0x2833E848,
+    0x8181585D, 0xB85045B6, 0xE131A029, 0x30644E72,
+];
+
+/// R^{-1} mod P where R = 2^256, as little-endian `[u32; 8]`.
+///
+/// Used for Montgomery multiplication via `sys_bigint`:
+/// `monty_mul(a, b) = (a * b) * R^{-1} mod P`
+const R_INV_U32: [u32; 8] = [
+    0x6DB1194E, 0xDC5BA005, 0xE111EC87, 0x090EF5A9,
+    0xAEB85D5D, 0xC8260DE4, 0x82C5551C, 0x15EBF951,
+];
+
+/// Convert `[u64; 4]` (little-endian) to `[u32; 8]` (little-endian).
+#[inline]
+pub(crate) const fn u64x4_to_u32x8(v: [u64; 4]) -> [u32; 8] {
+    [
+        v[0] as u32, (v[0] >> 32) as u32,
+        v[1] as u32, (v[1] >> 32) as u32,
+        v[2] as u32, (v[2] >> 32) as u32,
+        v[3] as u32, (v[3] >> 32) as u32,
+    ]
+}
+
+/// Convert `[u32; 8]` (little-endian) to `[u64; 4]` (little-endian).
+#[inline]
+pub(crate) const fn u32x8_to_u64x4(v: [u32; 8]) -> [u64; 4] {
+    [
+        v[0] as u64 | (v[1] as u64) << 32,
+        v[2] as u64 | (v[3] as u64) << 32,
+        v[4] as u64 | (v[5] as u64) << 32,
+        v[6] as u64 | (v[7] as u64) << 32,
+    ]
+}
+
+/// Runtime Montgomery multiplication: `lhs * rhs * R^{-1} mod P`.
+///
+/// When the `risc0` feature is enabled and compiling for the zkVM target,
+/// this dispatches to the `sys_bigint` hardware precompile (2 ecalls).
+/// Otherwise, falls back to the software `monty_mul`.
+#[cfg(all(feature = "risc0", target_os = "zkvm"))]
+#[inline]
+pub(crate) fn monty_mul_runtime(lhs: [u64; 4], rhs: [u64; 4]) -> [u64; 4] {
+    let x = u64x4_to_u32x8(lhs);
+    let y = u64x4_to_u32x8(rhs);
+    let mut tmp = [0u32; 8];
+    let mut result = [0u32; 8];
+    // SAFETY: sys_bigint computes (x * y) mod P for 256-bit operands.
+    // All inputs are valid 256-bit integers less than P.
+    unsafe {
+        risc0_zkvm_platform::syscall::sys_bigint(&mut tmp, 0, &x, &y, &BN254_PRIME_U32);
+        risc0_zkvm_platform::syscall::sys_bigint(&mut result, 0, &tmp, &R_INV_U32, &BN254_PRIME_U32);
+    }
+    u32x8_to_u64x4(result)
+}
+
+#[cfg(not(all(feature = "risc0", target_os = "zkvm")))]
+#[inline]
+pub(crate) fn monty_mul_runtime(lhs: [u64; 4], rhs: [u64; 4]) -> [u64; 4] {
+    monty_mul(lhs, rhs)
+}
+
 /// Const lexicographic comparison: returns true if a < b (little-endian limbs).
 #[inline]
 pub(crate) const fn const_lt(a: [u64; 4], b: [u64; 4]) -> bool {
